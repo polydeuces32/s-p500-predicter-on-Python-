@@ -1,0 +1,382 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "private_outputs": true,
+      "provenance": [],
+      "authorship_tag": "ABX9TyN67I6n3RZF4Lc9/0lu9TkH",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/polydeuces32/Image-transfer-/blob/main/Perdictors%20of%20the%20s%26p500\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import yfinance as yf\n",
+        "import pandas as pd\n",
+        "import os"
+      ],
+      "metadata": {
+        "id": "b4h1LTYUO9_t"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "if os.path.exists(\"sp500.csv\"):\n",
+        "    sp500 = pd.read_csv(\"sp500.csv\", index_col=0)\n",
+        "else:\n",
+        "    sp500 = yf.Ticker(\"^GSPC\")\n",
+        "    sp500 = sp500.history(period=\"max\")\n",
+        "    sp500.to_csv(\"sp500.csv\")"
+      ],
+      "metadata": {
+        "id": "OD2_7DWiPPrQ"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "sp500.index = pd.to_datetime(sp500.index)"
+      ],
+      "metadata": {
+        "id": "cDxIY3GEPVQx"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "sp500"
+      ],
+      "metadata": {
+        "id": "QU3UcgzUPanb"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "sp500.plot.line(y=\"Close\", use_index=True)"
+      ],
+      "metadata": {
+        "id": "STx9o7OYPh7U"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "del sp500[\"Dividends\"]\n",
+        "del sp500[\"Stock Splits\""
+      ],
+      "metadata": {
+        "id": "ozZCGH4CcMEO"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "sp500[\"Tomorrow\"] = sp500[\"Close\"].shift(-1)"
+      ],
+      "metadata": {
+        "id": "VfEcjd47cQYG"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "sp500[\"Target\"] = (sp500[\"Tomorrow\"] > sp500[\"Close\"]).astype(int)"
+      ],
+      "metadata": {
+        "id": "utFOYeiUcXB4"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "sp500 = sp500.loc[\"1990-01-01\":].copy()"
+      ],
+      "metadata": {
+        "id": "Td5fFLqscbAa"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from sklearn.ensemble import RandomForestClassifier\n",
+        "\n",
+        "model = RandomForestClassifier(n_estimators=100, min_samples_split=100, random_state=1)\n",
+        "\n",
+        "train = sp500.iloc[:-100]\n",
+        "test = sp500.iloc[-100:]\n",
+        "\n",
+        "predictors = [\"Close\", \"Volume\", \"Open\", \"High\", \"Low\"]\n",
+        "model.fit(train[predictors], train[\"Target\"])"
+      ],
+      "metadata": {
+        "id": "GBje0cbhcmke"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from sklearn.metrics import precision_score\n",
+        "\n",
+        "preds = model.predict(test[predictors])\n",
+        "preds = pd.Series(preds, index=test.index)\n",
+        "precision_score(test[\"Target\"], preds)"
+      ],
+      "metadata": {
+        "id": "qrZVFn17cwgo"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "combined = pd.concat([test[\"Target\"], preds], axis=1)\n",
+        "combined.plot()"
+      ],
+      "metadata": {
+        "id": "pO66IvoYc1t5"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "def predict(train, test, predictors, model):\n",
+        "    model.fit(train[predictors], train[\"Target\"])\n",
+        "    preds = model.predict(test[predictors])\n",
+        "    preds = pd.Series(preds, index=test.index, name=\"Predictions\")\n",
+        "    combined = pd.concat([test[\"Target\"], preds], axis=1)\n",
+        "    return combined"
+      ],
+      "metadata": {
+        "id": "f6ZK472Tc8ab"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "def backtest(data, model, predictors, start=2500, step=250):\n",
+        "    all_predictions = []\n",
+        "\n",
+        "    for i in range(start, data.shape[0], step):\n",
+        "        train = data.iloc[0:i].copy()\n",
+        "        test = data.iloc[i:(i+step)].copy()\n",
+        "        predictions = predict(train, test, predictors, model)\n",
+        "        all_predictions.append(predictions)\n",
+        "\n",
+        "    return pd.concat(all_predictions)"
+      ],
+      "metadata": {
+        "id": "ECCD73VIc-be"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "predictions = backtest(sp500, model, predictors)"
+      ],
+      "metadata": {
+        "id": "RKS4jwkPdFFf"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "predictions[\"Predictions\"].value_counts()"
+      ],
+      "metadata": {
+        "id": "TZ-FKPstdd40"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "precision_score(predictions[\"Target\"], predictions[\"Predictions\"])"
+      ],
+      "metadata": {
+        "id": "OeXlNzR-dh05"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "horizons = [2,5,60,250,1000]\n",
+        "new_predictors = []\n",
+        "\n",
+        "for horizon in horizons:\n",
+        "    rolling_averages = sp500.rolling(horizon).mean()\n",
+        "\n",
+        "    ratio_column = f\"Close_Ratio_{horizon}\"\n",
+        "    sp500[ratio_column] = sp500[\"Close\"] / rolling_averages[\"Close\"]\n",
+        "\n",
+        "    trend_column = f\"Trend_{horizon}\"\n",
+        "    sp500[trend_column] = sp500.shift(1).rolling(horizon).sum()[\"Target\"]\n",
+        "\n",
+        "    new_predictors+= [ratio_column, trend_column]"
+      ],
+      "metadata": {
+        "id": "yD8ak3wydlx0"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "sp500 = sp500.dropna(subset=sp500.columns[sp500.columns != \"Tomorrow\"])"
+      ],
+      "metadata": {
+        "id": "9HdnmkJydsZ2"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "sp500"
+      ],
+      "metadata": {
+        "id": "8OIRG8gXdwYn"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "model = RandomForestClassifier(n_estimators=200, min_samples_split=50, random_state=1)"
+      ],
+      "metadata": {
+        "id": "VNcO2yV1d3MR"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "def predict(train, test, predictors, model):\n",
+        "    model.fit(train[predictors], train[\"Target\"])\n",
+        "    preds = model.predict_proba(test[predictors])[:,1]\n",
+        "    preds[preds >=.6] = 1\n",
+        "    preds[preds <.6] = 0\n",
+        "    preds = pd.Series(preds, index=test.index, name=\"Predictions\")\n",
+        "    combined = pd.concat([test[\"Target\"], preds], axis=1)\n",
+        "    return combined"
+      ],
+      "metadata": {
+        "id": "3Z3lhBoQd9iK"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "predictions = backtest(sp500, model, new_predictors)"
+      ],
+      "metadata": {
+        "id": "uB0yG4pPeA3z"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "predictions[\"Predictions\"].value_counts()"
+      ],
+      "metadata": {
+        "id": "z59vd22ieE_w"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "precision_score(predictions[\"Target\"], predictions[\"Predictions\"])"
+      ],
+      "metadata": {
+        "id": "8bY5Z8BUeX50"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "predictions[\"Target\"].value_counts() / predictions.shape[0]"
+      ],
+      "metadata": {
+        "id": "M4FIAb8OeeIJ"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "predictions"
+      ],
+      "metadata": {
+        "id": "i2Mm0ewkeg4v"
+      },
+      "execution_count": null,
+      "outputs": []
+    }
+  ]
+}
